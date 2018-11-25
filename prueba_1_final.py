@@ -7,25 +7,81 @@ Created on Fri Oct 26 15:40:12 2018
 """
 
 import gtk
+import os 
+import threading
+
 tipo=""
 pais1 = ""
 especie1= ""
 numId= ""
 
-# Ventana para mostrar fastas 
-class WinFasta(gtk.Window):
+#--------- Funcion para mostrar el resultado de un comando 
+
+# iniciamos los thead (los iniciamos, aun no lo usamos)
+gtk.gdk.threads_init()
+
+comando = "python2 ejemplo.py"
+
+# Esta funcion es llamada desde la ventana
+def salida_comando(textview, buffer_texto, comando):
+    output = os.popen(comando)
+    while True:
+        linea = output.readline()
+        if not linea:
+            break
+        # Comienza el trababjo pesado, asi que entramos en un thread
+        gtk.gdk.threads_enter()
+        # Se inserta la siguiente linea de la salida del proceso y luego se
+        # coloca el cursor al final del textview (se mueve el scroll)
+        iter = buffer_texto.get_end_iter()
+        buffer_texto.place_cursor(iter)
+        buffer_texto.insert(iter, linea)
+        textview.scroll_to_mark(buffer_texto.get_insert(), 0.1)
+        # Finaliza el trabajo pesado, asi que salimos del thread
+        gtk.gdk.threads_leave()
+
+
+# Ventana para mostrar alineamiento simple entre dos secuencias 
+class WinAlign_S(gtk.Window):
     def __init__(self):   
         ############################
         #          Ventana         #
         ############################        
-        super(WinFasta,self).__init__()
+        super(WinAlign_S,self).__init__()
         # llamando al evento on_destroy 
         self.connect("destroy",self.on_destroy)
         self.set_default_size(500,400)   # size en formato x,y
         # titulo de la ventana
-        nombre = tipo + '_'+ especie1 + '_' + numId + '.fasta'
-        self.set_title(nombre)
+        self.set_title("Alineamiento Simple")
+       
+        # TextView para mostrar el alineamiento 
+        scrolled_window = gtk.ScrolledWindow()
+        scrolled_window.set_border_width(5)
+        # we scroll only if needed
+        scrolled_window.set_policy(
+            gtk.POLICY_AUTOMATIC, gtk.POLICY_AUTOMATIC)
 
+        # a text buffer (stores text)
+        buffer1 = gtk.TextBuffer()
+
+        # a textview (displays the buffer)
+        textview = gtk.TextView(buffer=buffer1)
+        buffer_texto = textview.get_buffer()
+        # wrap the text, if needed, breaking lines in between words
+        textview.set_wrap_mode(gtk.WRAP_WORD)
+
+        # textview is scrolled
+        scrolled_window.add(textview)
+
+        hilo = threading.Thread(target=salida_comando, args=(textview,buffer_texto ,comando))
+        hilo.start()
+
+
+        self.add(scrolled_window)
+
+        self.show_all()
+
+# Agregar menuBar al textEdit donde muestre la alineacion 
     def on_destroy(self,widget):
         widget.hide()
 
@@ -336,11 +392,12 @@ class anotherWinAlign(gtk.Window):
     
 
     # Funcion para la senal del boton alinear
-    def align_ButEvent(self,widget):
+    def align_ButEvent(self,win):
         tipo_align= self.combobox_align_type.get_active_text()
         #print(tipo_align)
         if (tipo_align == "Local"):
             print(tipo_align)
+            alignB_win = WinAlign_S()
         elif (tipo_align == "Global"): 
             print(tipo_align)
         
@@ -1072,7 +1129,7 @@ class PyApp(gtk.Window):
         # creando la ventana
         super(PyApp,self).__init__()
         self.set_default_size(320,330)
-        self.set_title("My Biology App")
+        self.set_title("BioGen")
         self.set_position(gtk.WIN_POS_CENTER)
         self.set_resizable(False)
 
@@ -1136,7 +1193,7 @@ class PyApp(gtk.Window):
 
         ########## Mensaje de Bienvenida
         message = gtk.Label()
-        message.set_markup("<b><big>¡Bienvenido a My Biology App!</big></b>")
+        message.set_markup("<b><big>¡Bienvenido a BioGen!</big></b>")
         
         ########## Mensaje que pide seleccionar una opcion
         message2= gtk.Label()
@@ -1192,7 +1249,7 @@ class PyApp(gtk.Window):
 
     def showAbout(self,win):
         about = gtk.AboutDialog()
-        about.set_program_name("My Biology App")
+        about.set_program_name("BioGen")
         about.set_authors(["Chia", "Ale", "Melissa", "Hazard"])
         about.set_copyright("(c) computer science students")
         about.set_comments("Course: Biología Computacional")
